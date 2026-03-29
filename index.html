@@ -1,69 +1,143 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Attendance Manager (WASM)</title>
+    <title>Attendance Manager</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 30px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        input, button {
+            padding: 8px;
+            margin: 5px;
+        }
+
+        button {
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            background: #007bff;
+            color: white;
+        }
+    </style>
 </head>
+
 <body>
 
-<h2>Attendance Manager</h2>
+<h1>Attendance Manager</h1>
 
-<h3>Add Student</h3>
-<input type="text" id="reg" placeholder="Reg No">
-<input type="text" id="name" placeholder="Name">
-<button onclick="addStudent()">Add</button>
+<div class="card">
+    <h3>Add Student</h3>
+    <input type="text" id="reg" placeholder="Reg No">
+    <input type="text" id="name" placeholder="Name">
+    <button onclick="addStudent()">Add</button>
+</div>
 
-<h3>Mark Attendance</h3>
-<input type="number" id="index" placeholder="Student Index">
-<input type="text" id="status" placeholder="P/A">
-<button onclick="markAttendance()">Mark</button>
-
-<h3>View Percentage</h3>
-<input type="number" id="viewIndex" placeholder="Student Index">
-<button onclick="viewPercentage()">View</button>
-
-<p id="output"></p>
+<div class="card">
+    <h3>Student List</h3>
+    <table id="table">
+        <thead>
+            <tr>
+                <th>Reg No</th>
+                <th>Name</th>
+                <th>Attendance %</th>
+                <th>Mark Present</th>
+                <th>Mark Absent</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
 
 <script src="attendance.js"></script>
 
 <script>
+let students = [];
+
 Module.onRuntimeInitialized = function () {
+    console.log("WASM Loaded");
 
     window.addStudent = function () {
         let reg = document.getElementById("reg").value;
         let name = document.getElementById("name").value;
 
+        if (!reg || !name) {
+            alert("Fill all fields!");
+            return;
+        }
+
         Module.ccall('addStudent', null,
             ['string', 'string'],
             [reg, name]);
 
-        alert("Student Added!");
+        students.push({reg, name});
+        renderTable();
     };
 
-    window.markAttendance = function () {
-        let index = parseInt(document.getElementById("index").value);
-        let status = document.getElementById("status").value;
-
-        if (status !== 'P' && status !== 'A') {
-            alert("Only P or A allowed!");
-            return;
-        }
-
+    window.mark = function(index, status) {
         Module.ccall('markAttendance', null,
             ['number', 'number'],
             [index, status.charCodeAt(0)]);
 
-        alert("Attendance Marked!");
+        renderTable();
     };
 
-    window.viewPercentage = function () {
-        let index = parseInt(document.getElementById("viewIndex").value);
+    function renderTable() {
+        let tbody = document.querySelector("#table tbody");
+        tbody.innerHTML = "";
 
-        let result = Module.ccall('getPercentage', 'number',
-            ['number'], [index]);
+        students.forEach((s, i) => {
+            let percent = Module.ccall('getPercentage', 'number',
+                ['number'], [i]);
 
-        document.getElementById("output").innerText =
-            "Attendance %: " + result.toFixed(2);
-    };
+            let row = `
+                <tr>
+                    <td>${s.reg}</td>
+                    <td>${s.name}</td>
+                    <td>${percent.toFixed(2)}%</td>
+                    <td><button onclick="mark(${i}, 'P')">P</button></td>
+                    <td><button onclick="mark(${i}, 'A')">A</button></td>
+                </tr>
+            `;
+
+            tbody.innerHTML += row;
+        });
+    }
 };
 </script>
 
