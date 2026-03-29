@@ -1,49 +1,26 @@
-#include <iostream>
+#include <emscripten/bind.h>
 #include <vector>
-#include <fstream>
+#include <string>
 #include <map>
+#include <sstream>
+
 using namespace std;
+using namespace emscripten;
 
 class Student {
-private:
+public:
     string regNo;
     string name;
-    vector<char> attendance; // P or A
+    map<string, char> attendance;
 
-public:
-    Student(string r, string n) {
-        regNo = r;
-        name = n;
-    }
+    Student(string r, string n) : regNo(r), name(n) {}
 
-    string getRegNo() { return regNo; }
-    string getName() { return name; }
-
-    void markAttendance(char status) {
-        attendance.push_back(status);
-    }
-
-    float getAttendancePercentage() {
+    float getPercentage() {
         if (attendance.size() == 0) return 0;
-
         int present = 0;
-        for (char c : attendance) {
-            if (c == 'P') present++;
-        }
+        for (auto &p : attendance)
+            if (p.second == 'P') present++;
         return (present * 100.0) / attendance.size();
-    }
-
-    void displaySummary() {
-        cout << "RegNo: " << regNo << ", Name: " << name << endl;
-        cout << "Attendance: ";
-        for (char c : attendance) cout << c << " ";
-        cout << "\nPercentage: " << getAttendancePercentage() << "%\n";
-    }
-
-    vector<char> getAttendance() { return attendance; }
-
-    void setAttendance(vector<char> att) {
-        attendance = att;
     }
 };
 
@@ -52,155 +29,86 @@ private:
     vector<Student> students;
 
 public:
-    void addStudent(string regNo, string name) {
+
+    string addStudent(string reg, string name) {
+        for (auto &s : students)
+            if (s.regNo == reg)
+                return "{\"ok\":false,\"msg\":\"Duplicate student\"}";
+
+        students.emplace_back(reg, name);
+        return "{\"ok\":true,\"msg\":\"Student added\"}";
+    }
+
+    string markAttendance(string reg, string date, string status) {
         for (auto &s : students) {
-            if (s.getRegNo() == regNo) {
-                cout << "Duplicate student not allowed!\n";
-                return;
+            if (s.regNo == reg) {
+                if (status != "P" && status != "A")
+                    return "{\"ok\":false,\"msg\":\"Only P/A allowed\"}";
+                s.attendance[date] = status[0];
+                return "{\"ok\":true,\"msg\":\"Attendance marked\"}";
             }
         }
-        students.push_back(Student(regNo, name));
-        cout << "Student added successfully.\n";
+        return "{\"ok\":false,\"msg\":\"Student not found\"}";
     }
 
-    void markAttendance() {
-        char status;
-        for (auto &s : students) {
-            cout << "Enter attendance for " << s.getName() << " (P/A): ";
-            cin >> status;
+    string getAllStudentsJSON() {
+        stringstream ss;
+        ss << "[";
+        for (int i = 0; i < students.size(); i++) {
+            auto &s = students[i];
+            float p = s.getPercentage();
+            ss << "{\"regNo\":\"" << s.regNo << "\",\"name\":\"" << s.name
+               << "\",\"percentage\":" << p
+               << ",\"shortage\":" << (p < 75 ? "true" : "false") << "}";
+            if (i != students.size()-1) ss << ",";
+        }
+        ss << "]";
+        return ss.str();
+    }
 
-            if (status != 'P' && status != 'A') {
-                cout << "Invalid input! Only P/A allowed.\n";
-                return;
+    string getStudentSummary(string reg) {
+        for (auto &s : students) {
+            if (s.regNo == reg) {
+                int total = s.attendance.size();
+                int present = 0;
+                for (auto &p : s.attendance)
+                    if (p.second == 'P') present++;
+
+                int absent = total - present;
+                float perc = s.getPercentage();
+
+                stringstream ss;
+                ss << "{\"ok\":true,\"totalDays\":" << total
+                   << ",\"present\":" << present
+                   << ",\"absent\":" << absent
+                   << ",\"percentage\":" << perc << "}";
+
+                return ss.str();
             }
-            s.markAttendance(status);
         }
+        return "{\"ok\":false,\"msg\":\"Student not found\"}";
     }
 
-    void viewStudent(string regNo) {
-        for (auto &s : students) {
-            if (s.getRegNo() == regNo) {
-                s.displaySummary();
-                return;
-            }
-        }
-        cout << "Student not found!\n";
+    int getStudentCount() {
+        return students.size();
     }
 
-    void listShortage() {
-        cout << "\n--- Students Below 75% ---\n";
-        for (auto &s : students) {
-            if (s.getAttendancePercentage() < 75) {
-                cout << s.getName() << " (" << s.getRegNo() << ") - "
-                     << s.getAttendancePercentage() << "%\n";
-            }
-        }
-    }
-
-    void classAverage() {
-        float total = 0;
-        for (auto &s : students) {
-            total += s.getAttendancePercentage();
-        }
-        if (students.size() == 0) {
-            cout << "No students available.\n";
-            return;
-        }
-        cout << "Class Average Attendance: "
-             << total / students.size() << "%\n";
-    }
-
-    void saveToFile() {
-        ofstream file("attendance.txt");
-        for (auto &s : students) {
-            file << s.getRegNo() << "," << s.getName() << ",";
-
-            vector<char> att = s.getAttendance();
-            for (char c : att) file << c;
-
-            file << endl;
-        }
-        file.close();
-    }
-
-    void loadFromFile() {
-        ifstream file("attendance.txt");
-        if (!file) return;
-
-        students.clear();
-        string regNo, name, att;
-
-        while (getline(file, regNo, ',')) {
-            getline(file, name, ',');
-            getline(file, att);
-
-            Student s(regNo, name);
-            vector<char> attendance;
-
-            for (char c : att) attendance.push_back(c);
-
-            s.setAttendance(attendance);
-            students.push_back(s);
-        }
-        file.close();
+    float getClassAverage() {
+        if (students.size() == 0) return 0;
+        float sum = 0;
+        for (auto &s : students) sum += s.getPercentage();
+        return sum / students.size();
     }
 };
 
-int main() {
-    AttendanceManager manager;
-    manager.loadFromFile();
-
-    int choice;
-    string regNo, name;
-
-    do {
-        cout << "\n===== Attendance Manager =====\n";
-        cout << "1. Add Student\n";
-        cout << "2. Mark Attendance\n";
-        cout << "3. View Student Summary\n";
-        cout << "4. List Shortage Students (<75%)\n";
-        cout << "5. Class Average Attendance\n";
-        cout << "6. Exit\n";
-        cout << "Enter choice: ";
-        cin >> choice;
-
-        switch (choice) {
-        case 1:
-            cout << "Enter RegNo: ";
-            cin >> regNo;
-            cout << "Enter Name: ";
-            cin >> name;
-            manager.addStudent(regNo, name);
-            break;
-
-        case 2:
-            manager.markAttendance();
-            break;
-
-        case 3:
-            cout << "Enter RegNo: ";
-            cin >> regNo;
-            manager.viewStudent(regNo);
-            break;
-
-        case 4:
-            manager.listShortage();
-            break;
-
-        case 5:
-            manager.classAverage();
-            break;
-
-        case 6:
-            manager.saveToFile();
-            cout << "Data saved. Exiting...\n";
-            break;
-
-        default:
-            cout << "Invalid choice!\n";
-        }
-
-    } while (choice != 6);
-
-    return 0;
+// ✅ BINDING (VERY IMPORTANT)
+EMSCRIPTEN_BINDINGS(my_module) {
+    class_<AttendanceManager>("AttendanceManager")
+        .constructor<>()
+        .function("addStudent", &AttendanceManager::addStudent)
+        .function("markAttendance", &AttendanceManager::markAttendance)
+        .function("getAllStudentsJSON", &AttendanceManager::getAllStudentsJSON)
+        .function("getStudentSummary", &AttendanceManager::getStudentSummary)
+        .function("getStudentCount", &AttendanceManager::getStudentCount)
+        .function("getClassAverage", &AttendanceManager::getClassAverage);
 }
