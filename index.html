@@ -1,167 +1,226 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Attendance Manager (Terminal UI)</title>
-    <style>
-        body {
-            background: black;
-            color: #00ff00;
-            font-family: monospace;
-            padding: 20px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance Manager - Shortage Predictor</title>
 
-        #output {
-            white-space: pre-wrap;
-            margin-bottom: 10px;
-        }
-
-        input {
-            background: black;
-            color: #00ff00;
-            border: none;
-            outline: none;
-            width: 90%;
-            font-family: monospace;
-        }
-    </style>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+header{background:linear-gradient(135deg,#1e293b,#334155);padding:24px;text-align:center;border-bottom:2px solid #3b82f6}
+header h1{font-size:1.8rem;color:#60a5fa}
+header p{color:#94a3b8;margin-top:4px}
+.container{max-width:900px;margin:24px auto;padding:0 16px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.tab{padding:10px 20px;background:#1e293b;border:1px solid #334155;border-radius:8px;cursor:pointer;color:#94a3b8;transition:.2s}
+.tab:hover,.tab.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.panel{display:none;background:#1e293b;border-radius:12px;padding:24px;border:1px solid #334155}
+.panel.active{display:block}
+label{display:block;margin:12px 0 4px;color:#94a3b8;font-size:.9rem}
+input,select{width:100%;padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;font-size:1rem}
+input:focus{outline:none;border-color:#3b82f6}
+button.btn{margin-top:16px;padding:12px 24px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer}
+button.btn:hover{background:#2563eb}
+.msg{margin-top:12px;padding:12px;border-radius:8px;font-size:.95rem}
+.msg.ok{background:#064e3b;color:#6ee7b7}
+.msg.err{background:#7f1d1d;color:#fca5a5}
+table{width:100%;border-collapse:collapse;margin-top:16px}
+th,td{padding:10px;border-bottom:1px solid #334155}
+th{background:#0f172a;color:#60a5fa}
+.shortage{color:#f87171;font-weight:bold}
+.safe{color:#34d399}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-top:16px}
+.stat{background:#0f172a;border-radius:10px;padding:20px;text-align:center;border:1px solid #334155}
+.stat .val{font-size:2rem;color:#60a5fa;font-weight:700}
+.stat .lbl{color:#94a3b8;font-size:.85rem}
+</style>
 </head>
+
 <body>
 
-<h2>Attendance Manager (Terminal)</h2>
+<header>
+<h1>📋 Attendance Manager</h1>
+<p>Shortage Predictor — WebAssembly Enabled</p>
+</header>
 
-<div id="output"></div>
-<input type="text" id="input" placeholder="Type command here..." autofocus>
+<div class="container">
+
+<div class="tabs">
+<div class="tab active" data-tab="add">Add Student</div>
+<div class="tab" data-tab="mark">Mark Attendance</div>
+<div class="tab" data-tab="summary">Student Summary</div>
+<div class="tab" data-tab="reports">Reports</div>
+</div>
+
+<!-- ADD -->
+<div class="panel active" id="tab-add">
+<h2>Add Student</h2>
+<label>Registration No</label>
+<input id="addRegNo" placeholder="e.g. 2024CS001">
+
+<label>Student Name</label>
+<input id="addName" placeholder="e.g. John Doe">
+
+<button class="btn" onclick="doAdd()">Add Student</button>
+<div id="addMsg"></div>
+</div>
+
+<!-- MARK -->
+<div class="panel" id="tab-mark">
+<h2>Mark Attendance</h2>
+<label>Registration No</label>
+<input id="markRegNo">
+
+<label>Date</label>
+<input id="markDate" type="date">
+
+<label>Status</label>
+<select id="markStatus">
+<option value="P">Present</option>
+<option value="A">Absent</option>
+</select>
+
+<button class="btn" onclick="doMark()">Mark</button>
+<div id="markMsg"></div>
+</div>
+
+<!-- SUMMARY -->
+<div class="panel" id="tab-summary">
+<h2>Student Summary</h2>
+<label>Registration No</label>
+<input id="sumRegNo">
+
+<button class="btn" onclick="doSummary()">View</button>
+<div id="summary-detail"></div>
+</div>
+
+<!-- REPORTS -->
+<div class="panel" id="tab-reports">
+<h2>Reports</h2>
+
+<div class="stat-grid">
+<div class="stat"><div class="val" id="rTotal">0</div><div class="lbl">Total Students</div></div>
+<div class="stat"><div class="val" id="rAvg">0%</div><div class="lbl">Class Average</div></div>
+<div class="stat"><div class="val shortage" id="rShort">0</div><div class="lbl">Below 75%</div></div>
+</div>
+
+<button class="btn" onclick="doReports()">Refresh</button>
+
+<table>
+<thead><tr><th>RegNo</th><th>Name</th><th>%</th><th>Status</th></tr></thead>
+<tbody id="allBody"></tbody>
+</table>
+
+</div>
+
+</div>
+
+<script src="attendance.js"></script>
 
 <script>
-let students = [];
+let mgr = null;
 
-function print(text) {
-    document.getElementById("output").innerHTML += text + "\n";
-}
-
-function handleCommand(cmd) {
-    let parts = cmd.split(" ");
-
-    switch(parts[0]) {
-
-        case "add":
-            if (parts.length < 3) {
-                print("Usage: add <regNo> <name>");
-                return;
-            }
-            let reg = parts[1];
-            let name = parts[2];
-
-            if (students.find(s => s.reg === reg)) {
-                print("Duplicate student!");
-                return;
-            }
-
-            students.push({reg, name, attendance: []});
-            print("Student added.");
-            break;
-
-        case "mark":
-            if (parts.length < 3) {
-                print("Usage: mark <index> <P/A>");
-                return;
-            }
-
-            let index = parseInt(parts[1]);
-            let status = parts[2].toUpperCase();
-
-            if (!students[index]) {
-                print("Invalid index!");
-                return;
-            }
-
-            if (status !== 'P' && status !== 'A') {
-                print("Only P or A allowed!");
-                return;
-            }
-
-            students[index].attendance.push(status);
-            print("Attendance marked.");
-            break;
-
-        case "view":
-            let i = parseInt(parts[1]);
-
-            if (!students[i]) {
-                print("Invalid index!");
-                return;
-            }
-
-            let att = students[i].attendance;
-            let p = att.filter(x => x === 'P').length;
-            let percent = att.length ? (p * 100 / att.length).toFixed(2) : 0;
-
-            print(`Name: ${students[i].name}`);
-            print(`Attendance: ${att.join(" ")}`);
-            print(`Percentage: ${percent}%`);
-            break;
-
-        case "list":
-            students.forEach((s, i) => {
-                let p = s.attendance.filter(x => x === 'P').length;
-                let percent = s.attendance.length ? (p * 100 / s.attendance.length).toFixed(2) : 0;
-
-                print(`${i}. ${s.name} (${s.reg}) - ${percent}%`);
-            });
-            break;
-
-        case "shortage":
-            students.forEach((s, i) => {
-                let p = s.attendance.filter(x => x === 'P').length;
-                let percent = s.attendance.length ? (p * 100 / s.attendance.length) : 0;
-
-                if (percent < 75) {
-                    print(`${s.name} - ${percent.toFixed(2)}%`);
-                }
-            });
-            break;
-
-        case "avg":
-            let total = 0;
-            students.forEach(s => {
-                let p = s.attendance.filter(x => x === 'P').length;
-                let percent = s.attendance.length ? (p * 100 / s.attendance.length) : 0;
-                total += percent;
-            });
-
-            let avg = students.length ? (total / students.length).toFixed(2) : 0;
-            print("Class Average: " + avg + "%");
-            break;
-
-        case "help":
-            print(`
-Commands:
-add <regNo> <name>
-mark <index> <P/A>
-view <index>
-list
-shortage
-avg
-help
-            `);
-            break;
-
-        default:
-            print("Unknown command. Type 'help'");
+// ✅ FIXED WASM LOADING
+createModule().then(Module => {
+    try {
+        mgr = new Module.AttendanceManager();
+        console.log("WASM Loaded");
+    } catch (e) {
+        alert("C++ binding missing. Check embind!");
     }
-}
-
-document.getElementById("input").addEventListener("keydown", function(e) {
-    if (e.key === "Enter") {
-        let cmd = this.value;
-        print("> " + cmd);
-        handleCommand(cmd);
-        this.value = "";
-    }
+}).catch(() => {
+    alert("Run using localhost server!");
 });
 
-// initial help
-print("Type 'help' to see commands");
+// Tabs
+document.querySelectorAll('.tab').forEach(t => {
+    t.onclick = () => {
+        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+        document.getElementById('tab-'+t.dataset.tab).classList.add('active');
+    };
+});
+
+// Helper
+function showMsg(id, ok, msg) {
+    const d = document.getElementById(id);
+    d.className = "msg " + (ok ? "ok" : "err");
+    d.textContent = msg;
+}
+
+// ADD
+function doAdd() {
+    if (!mgr) return alert("WASM not loaded");
+
+    let reg = addRegNo.value.trim();
+    let name = addName.value.trim();
+
+    if (!reg || !name) return showMsg("addMsg", false, "Fill all fields");
+
+    let res = JSON.parse(mgr.addStudent(reg, name));
+    showMsg("addMsg", res.ok, res.msg);
+}
+
+// MARK
+function doMark() {
+    if (!mgr) return alert("WASM not loaded");
+
+    let res = JSON.parse(
+        mgr.markAttendance(
+            markRegNo.value,
+            markDate.value,
+            markStatus.value
+        )
+    );
+
+    showMsg("markMsg", res.ok, res.msg);
+}
+
+// SUMMARY
+function doSummary() {
+    if (!mgr) return alert("WASM not loaded");
+
+    let r = JSON.parse(mgr.getStudentSummary(sumRegNo.value));
+    let d = document.getElementById("summary-detail");
+
+    if (!r.ok) {
+        d.innerHTML = `<div class="msg err">${r.msg}</div>`;
+        return;
+    }
+
+    d.innerHTML = `
+    <div class="stat-grid">
+        <div class="stat"><div class="val">${r.totalDays}</div><div>Total Days</div></div>
+        <div class="stat"><div class="val">${r.present}</div><div>Present</div></div>
+        <div class="stat"><div class="val">${r.absent}</div><div>Absent</div></div>
+        <div class="stat"><div class="val">${r.percentage.toFixed(2)}%</div><div>Attendance</div></div>
+    </div>`;
+}
+
+// REPORTS
+function doReports() {
+    if (!mgr) return alert("WASM not loaded");
+
+    let all = JSON.parse(mgr.getAllStudentsJSON());
+
+    rTotal.textContent = mgr.getStudentCount();
+    rAvg.textContent = mgr.getClassAverage().toFixed(2) + "%";
+
+    let h = "";
+    all.forEach(s => {
+        h += `<tr>
+        <td>${s.regNo}</td>
+        <td>${s.name}</td>
+        <td>${s.percentage.toFixed(2)}%</td>
+        <td class="${s.shortage?'shortage':'safe'}">
+            ${s.shortage?'⚠ Shortage':'✅ Safe'}
+        </td></tr>`;
+    });
+
+    allBody.innerHTML = h;
+}
 </script>
 
 </body>
