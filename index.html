@@ -58,7 +58,7 @@ button:hover {
 
 <h3>Mark Attendance</h3>
 <input id="reg2" placeholder="Reg No">
-<input id="date" placeholder="Date (e.g. 2026-03-29)">
+<input id="date" placeholder="Date (YYYY-MM-DD)">
 <input id="status" placeholder="P / A">
 <button onclick="markAttendance()">Mark</button>
 
@@ -67,19 +67,18 @@ button:hover {
 <button onclick="viewSummary()">View</button>
 
 <h3>Reports</h3>
-<button onclick="showAll()">Show All Students</button>
+<button onclick="showAll()">Show All</button>
 <button onclick="showAvg()">Class Average</button>
 
 <div class="output" id="output"></div>
 </div>
 
-<!-- WASM FIX -->
 <script>
 var Module = {
-  locateFile: function(path) {
-    if (path.endsWith(".wasm")) return "index.wasm";
-    return path;
-  }
+    locateFile: function(path) {
+        if (path.endsWith(".wasm")) return "index.wasm";
+        return path;
+    }
 };
 </script>
 
@@ -90,7 +89,6 @@ let mgr;
 
 createModule().then(Module => {
     mgr = new Module.AttendanceManager();
-    console.log("WASM Loaded");
 }).catch(err => {
     alert("WASM NOT LOADED");
     console.error(err);
@@ -119,8 +117,7 @@ function showAll() {
 }
 
 function showAvg() {
-    let avg = mgr.getClassAverage();
-    output.innerText = "Class Average: " + avg.toFixed(2) + "%";
+    output.innerText = "Average: " + mgr.getClassAverage().toFixed(2) + "%";
 }
 </script>
 
