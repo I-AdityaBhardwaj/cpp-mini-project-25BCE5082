@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Attendance Manager (WASM)</title>
+</head>
+<body>
+
+<h2>Attendance Manager</h2>
+
+<h3>Add Student</h3>
+<input type="text" id="reg" placeholder="Reg No">
+<input type="text" id="name" placeholder="Name">
+<button onclick="addStudent()">Add</button>
+
+<h3>Mark Attendance</h3>
+<input type="number" id="index" placeholder="Student Index">
+<input type="text" id="status" placeholder="P/A">
+<button onclick="markAttendance()">Mark</button>
+
+<h3>View Percentage</h3>
+<input type="number" id="viewIndex" placeholder="Student Index">
+<button onclick="viewPercentage()">View</button>
+
+<p id="output"></p>
+
+<script src="attendance.js"></script>
+
+<script>
+Module.onRuntimeInitialized = function () {
+
+    window.addStudent = function () {
+        let reg = document.getElementById("reg").value;
+        let name = document.getElementById("name").value;
+
+        Module.ccall('addStudent', null,
+            ['string', 'string'],
+            [reg, name]);
+
+        alert("Student Added!");
+    };
+
+    window.markAttendance = function () {
+        let index = parseInt(document.getElementById("index").value);
+        let status = document.getElementById("status").value;
+
+        if (status !== 'P' && status !== 'A') {
+            alert("Only P or A allowed!");
+            return;
+        }
+
+        Module.ccall('markAttendance', null,
+            ['number', 'number'],
+            [index, status.charCodeAt(0)]);
+
+        alert("Attendance Marked!");
+    };
+
+    window.viewPercentage = function () {
+        let index = parseInt(document.getElementById("viewIndex").value);
+
+        let result = Module.ccall('getPercentage', 'number',
+            ['number'], [index]);
+
+        document.getElementById("output").innerText =
+            "Attendance %: " + result.toFixed(2);
+    };
+};
+</script>
+
+</body>
+</html>
