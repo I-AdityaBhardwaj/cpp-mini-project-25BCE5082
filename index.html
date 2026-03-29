@@ -20,13 +20,9 @@ body {
     border-radius: 12px;
 }
 
-h2 {
-    text-align: center;
-}
+h2 { text-align: center; }
 
-.section {
-    margin-bottom: 20px;
-}
+.section { margin-bottom: 20px; }
 
 input, button {
     padding: 10px;
@@ -42,9 +38,7 @@ button {
     cursor: pointer;
 }
 
-button:hover {
-    background: #2563eb;
-}
+button:hover { background: #2563eb; }
 
 .output-box {
     margin-top: 20px;
@@ -52,7 +46,6 @@ button:hover {
     background: black;
     border-radius: 8px;
     min-height: 150px;
-    overflow-y: auto;
 }
 
 table, th, td {
@@ -60,9 +53,7 @@ table, th, td {
     padding: 8px;
 }
 
-th {
-    background: #1e40af;
-}
+th { background: #1e40af; }
 </style>
 </head>
 
@@ -81,7 +72,7 @@ th {
 <div class="section">
 <h3>Mark Attendance</h3>
 <input id="reg2" placeholder="Reg No">
-<input id="date" placeholder="Date (YYYY-MM-DD)">
+<input id="date" placeholder="DD/MM/YYYY">
 <input id="status" placeholder="P / A">
 <button onclick="markAttendance()">Mark Attendance</button>
 </div>
@@ -104,7 +95,6 @@ System Ready...
 
 </div>
 
-<!-- 🔥 SAFE WASM CONFIG -->
 <script>
 var Module = {
     noInitialRun: true,
@@ -122,91 +112,96 @@ let mgr;
 
 createModule().then(Module => {
     mgr = new Module.AttendanceManager();
-    document.getElementById("output").innerHTML = "✅ WASM Loaded Successfully";
+    output.innerHTML = "✅ WASM Loaded Successfully";
 });
 
-// ---------------- ADD STUDENT ----------------
+// 🔥 DATE CONVERTER (DD/MM/YYYY → YYYY-MM-DD)
+function convertDate(dateStr) {
+    let parts = dateStr.split("/");
+    if (parts.length !== 3) return null;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+// ---------------- ADD ----------------
 function addStudent() {
     let res = JSON.parse(mgr.addStudent(reg.value, name.value));
-    document.getElementById("output").innerHTML = `<p>✅ ${res.msg}</p>`;
+    output.innerHTML = `<b>✔ ${res.msg}</b>`;
 }
 
-// ---------------- MARK ATTENDANCE ----------------
+// ---------------- MARK ----------------
 function markAttendance() {
+    let converted = convertDate(date.value);
+
+    if (!converted) {
+        output.innerHTML = "❌ Invalid date format (use DD/MM/YYYY)";
+        return;
+    }
+
     let res = JSON.parse(
-        mgr.markAttendance(reg2.value, date.value, status.value)
+        mgr.markAttendance(reg2.value, converted, status.value)
     );
 
-    document.getElementById("output").innerHTML = `<p>📅 ${res.msg}</p>`;
+    output.innerHTML = `<b>📅 ${res.msg}</b>`;
 }
 
-// ---------------- SUMMARY (CARD VIEW) ----------------
+// ---------------- SUMMARY ----------------
 function viewSummary() {
     let res = JSON.parse(mgr.getStudentSummary(reg3.value));
 
-    let html = `
-        <div style="background:#111;padding:15px;border-radius:10px">
-            <h3>📊 Student Summary</h3>
-            <p><b>Total Days:</b> ${res.totalDays}</p>
-            <p><b>Present:</b> ${res.present}</p>
-            <p><b>Absent:</b> ${res.absent}</p>
-            <p><b>Attendance:</b> ${res.percentage.toFixed(2)}%</p>
-        </div>
+    output.innerHTML = `
+        <h3>📊 Student Summary</h3>
+        <p>Total Days: <b>${res.totalDays}</b></p>
+        <p>Present: <b>${res.present}</b></p>
+        <p>Absent: <b>${res.absent}</b></p>
+        <p>Attendance: <b>${res.percentage.toFixed(2)}%</b></p>
     `;
-
-    document.getElementById("output").innerHTML = html;
 }
 
-// ---------------- ALL STUDENTS (TABLE VIEW) ----------------
+// ---------------- TABLE ----------------
 function showAll() {
     let data = JSON.parse(mgr.getAllStudentsJSON());
 
     let html = `
-        <h3>📋 All Students</h3>
-        <table style="width:100%; border-collapse: collapse;">
-            <tr>
-                <th>Reg No</th>
-                <th>Name</th>
-                <th>Attendance %</th>
-                <th>Status</th>
-            </tr>
+        <h3>📋 Students List</h3>
+        <table width="100%">
+        <tr>
+            <th>Reg No</th>
+            <th>Name</th>
+            <th>%</th>
+            <th>Status</th>
+        </tr>
     `;
 
     data.forEach(s => {
+        let status = s.shortage ? "❌ Shortage" : "✔ OK";
         let color = s.shortage ? "red" : "lightgreen";
-        let status = s.shortage ? "Shortage" : "OK";
 
         html += `
-            <tr style="text-align:center;">
+            <tr>
                 <td>${s.regNo}</td>
                 <td>${s.name}</td>
                 <td>${s.percentage.toFixed(2)}%</td>
-                <td style="color:${color};">${status}</td>
+                <td style="color:${color}">${status}</td>
             </tr>
         `;
     });
 
     html += "</table>";
 
-    document.getElementById("output").innerHTML = html;
+    output.innerHTML = html;
 }
 
-// ---------------- CLASS AVERAGE ----------------
+// ---------------- AVG ----------------
 function showAvg() {
     let avg = mgr.getClassAverage();
 
-    let html = `
-        <div style="background:#111;padding:15px;border-radius:10px">
-            <h3>📈 Class Average</h3>
-            <p style="font-size:20px;color:lightgreen;">
-                ${avg.toFixed(2)}%
-            </p>
-        </div>
+    output.innerHTML = `
+        <h3>📈 Class Average</h3>
+        <p style="font-size:20px;color:lightgreen;">
+            ${avg.toFixed(2)}%
+        </p>
     `;
-
-    document.getElementById("output").innerHTML = html;
 }
-
 </script>
 
 </body>
