@@ -51,9 +51,17 @@ button:hover {
     padding: 15px;
     background: black;
     border-radius: 8px;
-    min-height: 120px;
-    white-space: pre-wrap;
+    min-height: 150px;
     overflow-y: auto;
+}
+
+table, th, td {
+    border: 1px solid #555;
+    padding: 8px;
+}
+
+th {
+    background: #1e40af;
 }
 </style>
 </head>
@@ -96,7 +104,7 @@ System Ready...
 
 </div>
 
-<!-- 🔥 EXTRA SAFE WASM CONFIG -->
+<!-- 🔥 SAFE WASM CONFIG -->
 <script>
 var Module = {
     noInitialRun: true,
@@ -110,65 +118,95 @@ var Module = {
 <script src="index.js"></script>
 
 <script>
-let mgr = null;
+let mgr;
 
 createModule().then(Module => {
     mgr = new Module.AttendanceManager();
-    log("WASM Loaded Successfully");
-}).catch(err => {
-    log("❌ WASM NOT LOADED");
-    console.error(err);
+    document.getElementById("output").innerHTML = "✅ WASM Loaded Successfully";
 });
 
-// 🔥 OUTPUT LOGGER
-function log(msg) {
-    const out = document.getElementById("output");
-    out.innerText += "\n" + msg;
-    out.scrollTop = out.scrollHeight;
-}
-
-// 🔥 FUNCTIONS
-
+// ---------------- ADD STUDENT ----------------
 function addStudent() {
-    if (!mgr) return log("Wait for WASM");
-
-    let reg = document.getElementById("reg").value;
-    let name = document.getElementById("name").value;
-
-    if (!reg || !name) return log("⚠ Fill all fields");
-
-    let res = JSON.parse(mgr.addStudent(reg, name));
-    log("Add Student → " + res.msg);
+    let res = JSON.parse(mgr.addStudent(reg.value, name.value));
+    document.getElementById("output").innerHTML = `<p>✅ ${res.msg}</p>`;
 }
 
+// ---------------- MARK ATTENDANCE ----------------
 function markAttendance() {
-    let reg = document.getElementById("reg2").value;
-    let date = document.getElementById("date").value;
-    let status = document.getElementById("status").value;
-
     let res = JSON.parse(
-        mgr.markAttendance(reg, date, status)
+        mgr.markAttendance(reg2.value, date.value, status.value)
     );
 
-    log("Mark Attendance → " + res.msg);
+    document.getElementById("output").innerHTML = `<p>📅 ${res.msg}</p>`;
 }
 
+// ---------------- SUMMARY (CARD VIEW) ----------------
 function viewSummary() {
-    let reg = document.getElementById("reg3").value;
+    let res = JSON.parse(mgr.getStudentSummary(reg3.value));
 
-    let res = JSON.parse(mgr.getStudentSummary(reg));
-    log("Summary:\n" + JSON.stringify(res, null, 2));
+    let html = `
+        <div style="background:#111;padding:15px;border-radius:10px">
+            <h3>📊 Student Summary</h3>
+            <p><b>Total Days:</b> ${res.totalDays}</p>
+            <p><b>Present:</b> ${res.present}</p>
+            <p><b>Absent:</b> ${res.absent}</p>
+            <p><b>Attendance:</b> ${res.percentage.toFixed(2)}%</p>
+        </div>
+    `;
+
+    document.getElementById("output").innerHTML = html;
 }
 
+// ---------------- ALL STUDENTS (TABLE VIEW) ----------------
 function showAll() {
-    let res = JSON.parse(mgr.getAllStudentsJSON());
-    log("All Students:\n" + JSON.stringify(res, null, 2));
+    let data = JSON.parse(mgr.getAllStudentsJSON());
+
+    let html = `
+        <h3>📋 All Students</h3>
+        <table style="width:100%; border-collapse: collapse;">
+            <tr>
+                <th>Reg No</th>
+                <th>Name</th>
+                <th>Attendance %</th>
+                <th>Status</th>
+            </tr>
+    `;
+
+    data.forEach(s => {
+        let color = s.shortage ? "red" : "lightgreen";
+        let status = s.shortage ? "Shortage" : "OK";
+
+        html += `
+            <tr style="text-align:center;">
+                <td>${s.regNo}</td>
+                <td>${s.name}</td>
+                <td>${s.percentage.toFixed(2)}%</td>
+                <td style="color:${color};">${status}</td>
+            </tr>
+        `;
+    });
+
+    html += "</table>";
+
+    document.getElementById("output").innerHTML = html;
 }
 
+// ---------------- CLASS AVERAGE ----------------
 function showAvg() {
     let avg = mgr.getClassAverage();
-    log("Class Average: " + avg.toFixed(2) + "%");
+
+    let html = `
+        <div style="background:#111;padding:15px;border-radius:10px">
+            <h3>📈 Class Average</h3>
+            <p style="font-size:20px;color:lightgreen;">
+                ${avg.toFixed(2)}%
+            </p>
+        </div>
+    `;
+
+    document.getElementById("output").innerHTML = html;
 }
+
 </script>
 
 </body>
