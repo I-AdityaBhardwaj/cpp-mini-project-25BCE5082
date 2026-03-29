@@ -90,11 +90,13 @@ th { background: #1e40af; }
 </div>
 
 <div class="output-box" id="output">
-System Ready...
+<h3>👋 Welcome to Attendance Manager</h3>
+<p>Use the form above to add students, mark attendance, and view reports.</p>
 </div>
 
 </div>
 
+<!-- SAFE WASM CONFIG -->
 <script>
 var Module = {
     noInitialRun: true,
@@ -108,14 +110,19 @@ var Module = {
 <script src="index.js"></script>
 
 <script>
-let mgr;
+let mgr = null;
 
+// WAIT FOR WASM
 createModule().then(Module => {
     mgr = new Module.AttendanceManager();
-    output.innerHTML = "✅ WASM Loaded Successfully";
 });
 
-// 🔥 DATE CONVERTER (DD/MM/YYYY → YYYY-MM-DD)
+// OUTPUT FUNCTION
+function setOutput(html) {
+    document.getElementById("output").innerHTML = html;
+}
+
+// DATE CONVERSION
 function convertDate(dateStr) {
     let parts = dateStr.split("/");
     if (parts.length !== 3) return null;
@@ -124,41 +131,67 @@ function convertDate(dateStr) {
 
 // ---------------- ADD ----------------
 function addStudent() {
-    let res = JSON.parse(mgr.addStudent(reg.value, name.value));
-    output.innerHTML = `<b>✔ ${res.msg}</b>`;
+    if (!mgr) return setOutput("⏳ Loading...");
+
+    let reg = document.getElementById("reg").value;
+    let name = document.getElementById("name").value;
+
+    if (!reg || !name) {
+        return setOutput("❌ Please fill all fields");
+    }
+
+    let res = JSON.parse(mgr.addStudent(reg, name));
+
+    setOutput(`
+        <h3>✔ Student Added</h3>
+        <p>${res.msg}</p>
+    `);
 }
 
 // ---------------- MARK ----------------
 function markAttendance() {
-    let converted = convertDate(date.value);
+    if (!mgr) return setOutput("⏳ Loading...");
 
+    let reg = document.getElementById("reg2").value;
+    let date = document.getElementById("date").value;
+    let status = document.getElementById("status").value;
+
+    let converted = convertDate(date);
     if (!converted) {
-        output.innerHTML = "❌ Invalid date format (use DD/MM/YYYY)";
-        return;
+        return setOutput("❌ Invalid date format (DD/MM/YYYY)");
     }
 
     let res = JSON.parse(
-        mgr.markAttendance(reg2.value, converted, status.value)
+        mgr.markAttendance(reg, converted, status)
     );
 
-    output.innerHTML = `<b>📅 ${res.msg}</b>`;
+    setOutput(`
+        <h3>📅 Attendance Updated</h3>
+        <p>${res.msg}</p>
+    `);
 }
 
 // ---------------- SUMMARY ----------------
 function viewSummary() {
-    let res = JSON.parse(mgr.getStudentSummary(reg3.value));
+    if (!mgr) return setOutput("⏳ Loading...");
 
-    output.innerHTML = `
+    let reg = document.getElementById("reg3").value;
+
+    let res = JSON.parse(mgr.getStudentSummary(reg));
+
+    setOutput(`
         <h3>📊 Student Summary</h3>
         <p>Total Days: <b>${res.totalDays}</b></p>
         <p>Present: <b>${res.present}</b></p>
         <p>Absent: <b>${res.absent}</b></p>
         <p>Attendance: <b>${res.percentage.toFixed(2)}%</b></p>
-    `;
+    `);
 }
 
 // ---------------- TABLE ----------------
 function showAll() {
+    if (!mgr) return setOutput("⏳ Loading...");
+
     let data = JSON.parse(mgr.getAllStudentsJSON());
 
     let html = `
@@ -167,7 +200,7 @@ function showAll() {
         <tr>
             <th>Reg No</th>
             <th>Name</th>
-            <th>%</th>
+            <th>Attendance %</th>
             <th>Status</th>
         </tr>
     `;
@@ -188,19 +221,21 @@ function showAll() {
 
     html += "</table>";
 
-    output.innerHTML = html;
+    setOutput(html);
 }
 
 // ---------------- AVG ----------------
 function showAvg() {
+    if (!mgr) return setOutput("⏳ Loading...");
+
     let avg = mgr.getClassAverage();
 
-    output.innerHTML = `
+    setOutput(`
         <h3>📈 Class Average</h3>
         <p style="font-size:20px;color:lightgreen;">
             ${avg.toFixed(2)}%
         </p>
-    `;
+    `);
 }
 </script>
 
